@@ -1,0 +1,172 @@
+diff --git a/menu_admin_per_menu.api.php b/menu_admin_per_menu.api.php
+index f6a96f9..0ea5fcf 100644
+--- a/menu_admin_per_menu.api.php
++++ b/menu_admin_per_menu.api.php
+@@ -19,19 +19,18 @@ use Drupal\Core\Session\AccountInterface;
+  *   The $perm_menus array returned by getPerMenuPermissions()
+  *   for a user account. Values in array are menu machine names and keys are
+  *   permission name for appropriate menu.
+- *
+  * @param \Drupal\Core\Session\AccountInterface $account
+  *   The user account object.
+  *
+  * @see \Drupal\menu_admin_per_menu\MenuAdminPerMenuAccessInterface::getPerMenuPermissions()
+  * @ingroup menu
+  */
+-function hook_menu_admin_per_menu_get_permissions_alter(&$perm_menus, AccountInterface $account) {
++function hook_menu_admin_per_menu_get_permissions_alter(array &$perm_menus, AccountInterface $account) {
++
+   // Our sample module never allows certain roles to edit or delete
+   // content. Since some other node access modules might allow this
+   // permission, we expressly remove it by returning an empty $grants
+   // array for roles specified in our variable setting.
+-
+   if ($account->id()) {
+     $perm_menus['administer custom-menu menu items'] = 'custom-menu';
+   }
+diff --git a/menu_admin_per_menu.services.yml b/menu_admin_per_menu.services.yml
+index 9cfed90..ab5ae76 100644
+--- a/menu_admin_per_menu.services.yml
++++ b/menu_admin_per_menu.services.yml
+@@ -4,4 +4,5 @@ services:
+     tags:
+       - { name: event_subscriber }
+   menu_admin_per_menu.allowed_menus:
+-      class: Drupal\menu_admin_per_menu\Access\MenuAdminPerMenuAccess
++    class: Drupal\menu_admin_per_menu\Access\MenuAdminPerMenuAccess
++    arguments: ['@module_handler']
+diff --git a/src/Access/MenuAdminPerMenuAccess.php b/src/Access/MenuAdminPerMenuAccess.php
+index c5f3f36..77137d7 100644
+--- a/src/Access/MenuAdminPerMenuAccess.php
++++ b/src/Access/MenuAdminPerMenuAccess.php
+@@ -3,6 +3,7 @@
+ namespace Drupal\menu_admin_per_menu\Access;
+ 
+ use Drupal\Core\Access\AccessResult;
++use Drupal\Core\Extension\ModuleHandlerInterface;
+ use Drupal\Core\Menu\MenuLinkInterface;
+ use Drupal\Core\Session\AccountInterface;
+ use Drupal\menu_admin_per_menu\MenuAdminPerMenuAccessInterface;
+@@ -14,6 +15,23 @@ use Drupal\system\Entity\Menu;
+  */
+ class MenuAdminPerMenuAccess implements MenuAdminPerMenuAccessInterface {
+ 
++  /**
++   * The module handler.
++   *
++   * @var \Drupal\Core\Extension\ModuleHandlerInterface
++   */
++  protected $moduleHandler;
++
++  /**
++   * Constructs a new MenuAdminPerMenuAccess manager.
++   *
++   * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
++   *   The module handler.
++   */
++  public function __construct(ModuleHandlerInterface $module_handler) {
++    $this->moduleHandler = $module_handler;
++  }
++
+   /**
+    * {@inheritdoc}
+    */
+@@ -28,10 +46,9 @@ class MenuAdminPerMenuAccess implements MenuAdminPerMenuAccessInterface {
+           $perms_menu[$permission] = $name;
+         }
+       }
+-      \Drupal::moduleHandler()->alter('menu_admin_per_menu_get_permissions', $perms_menu, $account);
++      $this->moduleHandler->alter('menu_admin_per_menu_get_permissions', $perms_menu, $account);
+     }
+ 
+-
+     return $perms_menu;
+   }
+ 
+diff --git a/src/MenuAdminPerMenuAccessInterface.php b/src/MenuAdminPerMenuAccessInterface.php
+index 3deab45..44d4563 100644
+--- a/src/MenuAdminPerMenuAccessInterface.php
++++ b/src/MenuAdminPerMenuAccessInterface.php
+@@ -24,7 +24,7 @@ interface MenuAdminPerMenuAccessInterface {
+   public function getPerMenuPermissions(AccountInterface $account);
+ 
+   /**
+-   * A custom access check for menu overview page
++   * A custom access check for menu overview page.
+    *
+    * @param \Drupal\Core\Session\AccountInterface $account
+    *   Run access checks for this account.
+diff --git a/src/MenuAdminPerMenuPermissions.php b/src/MenuAdminPerMenuPermissions.php
+index 4a2b9bd..f688452 100644
+--- a/src/MenuAdminPerMenuPermissions.php
++++ b/src/MenuAdminPerMenuPermissions.php
+@@ -4,6 +4,14 @@ namespace Drupal\menu_admin_per_menu;
+ 
+ use Drupal\Core\StringTranslation\StringTranslationTrait;
+ 
++/**
++ * Menu Admin Per Menu Permissions class.
++ *
++ * Manages getting a list of menus, and generating a list of permissions per
++ * menu.
++ *
++ * @ingroup menu_admin_per_menu
++ */
+ class MenuAdminPerMenuPermissions {
+ 
+   use StringTranslationTrait;
+@@ -12,6 +20,7 @@ class MenuAdminPerMenuPermissions {
+    * Returns an array of existing menus on site.
+    *
+    * @return array
++   *   Array of existing menus on the site.
+    */
+   protected function getExistingMenus() {
+     return menu_ui_get_menus();
+@@ -21,6 +30,7 @@ class MenuAdminPerMenuPermissions {
+    * Returns an array of menu_admin_per_menu permissions.
+    *
+    * @return array
++   *   Array of permissions associated with menus.
+    */
+   public function permissions() {
+     $permissions = [];
+diff --git a/tests/src/Functional/MenuAdminPerMenuNodeSaveTest.php b/tests/src/Functional/MenuAdminPerMenuNodeSaveTest.php
+index b49719c..6908fb2 100644
+--- a/tests/src/Functional/MenuAdminPerMenuNodeSaveTest.php
++++ b/tests/src/Functional/MenuAdminPerMenuNodeSaveTest.php
+@@ -3,6 +3,7 @@
+ namespace Drupal\Tests\menu_admin_per_menu\Functional;
+ 
+ use Drupal\Tests\BrowserTestBase;
++use Drupal\Core\StringTranslation\StringTranslationTrait;
+ 
+ /**
+  * Tests the interaction of the node system with menu links.
+@@ -11,6 +12,8 @@ use Drupal\Tests\BrowserTestBase;
+  */
+ class MenuAdminPerMenuNodeSaveTest extends BrowserTestBase {
+ 
++  use StringTranslationTrait;
++
+   /**
+    * {@inheritdoc}
+    */
+@@ -95,7 +98,7 @@ class MenuAdminPerMenuNodeSaveTest extends BrowserTestBase {
+       'menu[enabled]' => 1,
+       'menu[title]' => $menu_link_title,
+     ];
+-    $this->drupalPostForm('node/add/page', $edit, t('Save'));
++    $this->drupalPostForm('node/add/page', $edit, $this->t('Save'));
+ 
+     // Ensure the menu is in place.
+     $this->assertSession()->linkExists($menu_link_title);
+@@ -109,7 +112,7 @@ class MenuAdminPerMenuNodeSaveTest extends BrowserTestBase {
+       'title[0][value]' => $this->randomString(),
+       'body[0][value]' => $this->randomString(),
+     ];
+-    $this->drupalPostForm('node/add/page', $edit, t('Save'));
++    $this->drupalPostForm('node/add/page', $edit, $this->t('Save'));
+ 
+     // Ensure the menu is still in place.
+     $this->assertSession()->linkExists($menu_link_title);
