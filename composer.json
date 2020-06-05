@@ -90,9 +90,6 @@
             "drupal/core": "-p2"
         },
         "patches": {
-            "drupal/menu_admin_per_menu": {
-                "Coding Standards": "https://www.drupal.org/files/issues/2020-06-03/3145325-02.patch"
-            }
         }
     },
     "scripts": {
