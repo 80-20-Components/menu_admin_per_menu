@@ -1,0 +1,55 @@
+diff --git a/menu_admin_per_menu.services.yml b/menu_admin_per_menu.services.yml
+index 790ae59..ab5ae76 100644
+--- a/menu_admin_per_menu.services.yml
++++ b/menu_admin_per_menu.services.yml
+@@ -5,3 +5,4 @@ services:
+       - { name: event_subscriber }
+   menu_admin_per_menu.allowed_menus:
+     class: Drupal\menu_admin_per_menu\Access\MenuAdminPerMenuAccess
++    arguments: ['@module_handler']
+diff --git a/src/Access/MenuAdminPerMenuAccess.php b/src/Access/MenuAdminPerMenuAccess.php
+index dc37a9e..02fc5ff 100644
+--- a/src/Access/MenuAdminPerMenuAccess.php
++++ b/src/Access/MenuAdminPerMenuAccess.php
+@@ -3,6 +3,7 @@
+ namespace Drupal\menu_admin_per_menu\Access;
+ 
+ use Drupal\Core\Access\AccessResult;
++use Drupal\Core\Extension\ModuleHandlerInterface;
+ use Drupal\Core\Menu\MenuLinkInterface;
+ use Drupal\Core\Session\AccountInterface;
+ use Drupal\menu_admin_per_menu\MenuAdminPerMenuAccessInterface;
+@@ -14,6 +15,24 @@ use Drupal\system\Entity\Menu;
+  */
+ class MenuAdminPerMenuAccess implements MenuAdminPerMenuAccessInterface {
+ 
++  /**
++   * The module handler.
++   *
++   * @var \Drupal\Core\Extension\ModuleHandlerInterface
++   */
++  protected $moduleHandler;
++
++  /**
++   * Constructs a new MenuAdminPerMenuAccess manager.
++   *
++   * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
++   *   The module handler.
++   */
++  public function __construct(ModuleHandlerInterface $module_handler) {
++    $this->moduleHandler = $module_handler;
++  }
++
++
+   /**
+    * {@inheritdoc}
+    */
+@@ -29,7 +48,7 @@ class MenuAdminPerMenuAccess implements MenuAdminPerMenuAccessInterface {
+         }
+       }
+       $user_perms_menu = $perms_menu[$account->id()] ?? [];
+-      \Drupal::moduleHandler()->alter('menu_admin_per_menu_get_permissions', $user_perms_menu, $account);
++      $this->moduleHandler->alter('menu_admin_per_menu_get_permissions', $user_perms_menu, $account);
+       $perms_menu[$account->id()] = $user_perms_menu;
+     }
+ 

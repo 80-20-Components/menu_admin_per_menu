@@ -90,6 +90,9 @@
             "drupal/core": "-p2"
         },
         "patches": {
+	      "drupal/menu_admin_per_menu": {
+	        "Reintroducing dependency injection for ModuleInterface": "patches/coding-standards-patch-2.patch"	
+          }
         }
     },
     "scripts": {
